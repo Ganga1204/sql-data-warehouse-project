@@ -41,4 +41,4 @@ ERP and CRM datasets provided as CSV files.
 - Sales trends over time
 
 ## Documentation
-Project planning and documentation maintained using Notion.
+Project planning and documentation maintained using Notion and Draw.io.
