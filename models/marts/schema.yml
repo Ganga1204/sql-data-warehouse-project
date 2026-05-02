@@ -1,0 +1,27 @@
+version: 2
+
+models:
+  - name: dim_customers
+    description: "Customer dimension with lifetime value and RFM segmentation"
+    columns:
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+      - name: customer_segment
+        tests:
+          - accepted_values:
+              values:
+                - 'High Value'
+                - 'Mid Value'
+                - 'Low Value'
+
+  - name: fct_sales
+    description: "Sales fact table — one row per order line"
+    columns:
+      - name: order_number
+        tests:
+          - not_null
+
+  - name: mart_product_performance
+    description: "Product-level sales aggregation with revenue ranking"
