@@ -1,0 +1,8 @@
+# dbt_project.yml - the configuration file for dbt
+
+name: my_project
+version: '1.0'
+profile: my_profile
+source-paths:
+  - models
+# Add other configurations below...
