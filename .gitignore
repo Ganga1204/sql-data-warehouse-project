@@ -1,0 +1,7 @@
+dbt_warehouse/target/
+dbt_warehouse/logs/
+dbt_warehouse/dbt_packages/
+profiles.yml
+.env
+airflow/logs/
+Thumbs.db
