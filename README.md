@@ -55,6 +55,13 @@ A production-grade data warehouse built on SQL Server using the Medallion Archit
      └────────────────┬───────────────────────┘
                       ▼
      ┌────────────────────────────────────────┐
+     │  🔄 Airflow — Automated Orchestration  │
+     │  ✓ 6 Automated Pipelines               │
+     │  ✓ Runs daily at 6 AM                  │
+     │  ✓ Automated airflow_dag.png            │
+     └────────────────┬───────────────────────┘
+                      ▼
+     ┌────────────────────────────────────────┐
      │  📊 METABASE — BI Dashboards           │
      │  ✓ Revenue trends                      │
      │  ✓ Customer segments                   │
@@ -101,7 +108,13 @@ dbt test
 dbt docs serve --port 8081
 ```
 
-#### 3️⃣ Launch Metabase Dashboard
+#### 3️⃣ Start Airflow
+cd airflow
+docker-compose up -d
+# Open http://localhost:8083
+
+
+#### 4 Launch Metabase Dashboard
 ```bash
 docker run -d -p 3000:3000 --name metabase metabase/metabase
 # Open http://localhost:3000
