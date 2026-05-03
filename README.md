@@ -180,7 +180,7 @@ models/
 ```bash
 dbt docs serve --port 8081
 ```
-![dbt Lineage Graph](docs/images/dbt_lineage.png)
+![Data Lineage Graph](docs/images/DataLineage.png)
 
 ---
 
@@ -198,7 +198,7 @@ check_sources → dbt_staging → dbt_intermediate → dbt_marts → dbt_test �
 - **Customer Segments** — RFM-based customer classification
 - **Product Performance** — Top/bottom performers by category
 
-![Metabase Dashboard](docs/images/metabase_dashboard.png)
+![Metabase Dashboard](docs/images/Metabase_dashboard.png)
 
 ---
 
