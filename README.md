@@ -184,6 +184,13 @@ dbt docs serve --port 8081
 
 ---
 
+### Airflow Pipeline (Orchestration)
+
+6-task automated pipeline runs daily at 6 AM:
+check_sources → dbt_staging → dbt_intermediate → dbt_marts → dbt_test → dbt_docs
+
+![Airflow_dag_Pipeline](docs/images/airflow_dag.png)
+
 ## 📊 Metabase Dashboards
 
 ### Available Views
