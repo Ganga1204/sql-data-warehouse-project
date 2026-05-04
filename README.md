@@ -6,7 +6,7 @@
 [![Metabase](https://img.shields.io/badge/Metabase-Dashboard-509EE3)](https://www.metabase.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A production-grade data warehouse built on SQL Server using the Medallion Architecture (Bronze → Silver → Gold), with dbt for transformations and lineage, and Metabase for business analytics dashboards.
+A production-grade data warehouse built on SQL Server using the Medallion Architecture (Bronze → Silver → Gold), with dbt for transformations and lineage, and Metabase for business analytics.
 
 **Scale:** 10 source files · 15 tables · 195,469 records · ERP + CRM
 
@@ -17,7 +17,7 @@ A production-grade data warehouse built on SQL Server using the Medallion Archit
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │                        DATA SOURCES                             │
-├──────────────────────┬──────────────────────────────────────────┤
+├──────────────────────┬─────────────────────────────────────────┤
 │   ERP System (CSV)   │      CRM System (CSV)                    │
 │  • Customers         │   • Customer Info                        │
 │  • Locations         │   • Sales Details                        │
@@ -53,6 +53,13 @@ A production-grade data warehouse built on SQL Server using the Medallion Archit
      │  ✓ 7 models (staging/intermediate)     │
      │  ✓ 4 data quality tests                │
      │  ✓ Automated lineage graph             │
+     └────────────────┬───────────────────────┘
+                      ▼
+     ┌────────────────────────────────────────┐
+     │  🔄 Airflow — Automated Orchestration  │
+     │  ✓ 6 Automated Pipelines               │
+     │  ✓ Runs daily at 6 AM                  │
+     │  ✓ Automated airflow_dag.png            │
      └────────────────┬───────────────────────┘
                       ▼
      ┌────────────────────────────────────────┐
@@ -102,7 +109,13 @@ dbt test
 dbt docs serve --port 8081
 ```
 
-#### 3️⃣ Launch Metabase Dashboard
+#### 3️⃣ Start Airflow
+cd airflow
+docker-compose up -d
+# Open http://localhost:8083
+
+
+#### 4 Launch Metabase Dashboard
 ```bash
 docker run -d -p 3000:3000 --name metabase metabase/metabase
 # Open http://localhost:3000
@@ -168,9 +181,16 @@ models/
 ```bash
 dbt docs serve --port 8081
 ```
-![DataLineage Graph](docs/images/DataLineage.png)
+![Data Lineage Graph](docs/images/DataLineage.png)
 
 ---
+
+### Airflow Pipeline (Orchestration)
+
+6-task automated pipeline runs daily at 6 AM:
+check_sources → dbt_staging → dbt_intermediate → dbt_marts → dbt_test → dbt_docs
+
+![Airflow_dag_Pipeline](docs/images/airflow_dag.png.png)
 
 ## 📊 Metabase Dashboards
 
