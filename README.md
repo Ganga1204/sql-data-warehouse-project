@@ -1,5 +1,6 @@
 # Modern Data Warehouse — Medallion Architecture + dbt + Metabase
 
+[![dbt CI](https://github.com/Ganga1204/sql-data-warehouse-project/actions/workflows/dbt_ci.yml/badge.svg)](https://github.com/Ganga1204/sql-data-warehouse-project/actions)
 [![dbt](https://img.shields.io/badge/dbt-1.11-orange)](https://www.getdbt.com/)
 [![SQL Server](https://img.shields.io/badge/SQL_Server-2022-blue)](https://www.microsoft.com/sql-server)
 [![Metabase](https://img.shields.io/badge/Metabase-Dashboard-509EE3)](https://www.metabase.com/)
