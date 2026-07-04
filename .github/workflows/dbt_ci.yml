@@ -9,28 +9,76 @@ on:
 jobs:
   dbt-validate:
     runs-on: ubuntu-latest
-    name: Validate dbt Models
+    name: Validate and Test dbt Models
+
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          SA_PASSWORD: "TestPassword123!"
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd="/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P TestPassword123! -Q 'SELECT 1'"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Install dbt
-        run: pip install dbt-core
+      - name: Install dbt + SQL Server adapter
+        run: pip install dbt-core dbt-sqlserver
 
-      - name: Check dbt project structure
+      # NOTE: models/ lives at the REPO ROOT (not inside dbt_warehouse/),
+      # and dbt_project.yml at the root already points model-paths to "models".
+      # We run dbt from the repo root, not from dbt_warehouse/.
+      - name: Load Bronze + Silver + Gold layers into test DB
         run: |
-          cd dbt_warehouse
-          echo "Checking dbt project files..."
-          ls -la models/staging/
-          ls -la models/intermediate/
-          ls -la models/marts/
-          echo "All model files present - dbt project structure is valid"
+          /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "TestPassword123!" -Q "CREATE DATABASE DataWarehouse"
+          /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "TestPassword123!" -d DataWarehouse -i scripts/init_database.sql
+          /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "TestPassword123!" -d DataWarehouse -i scripts/bronze/*.sql
+          /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "TestPassword123!" -d DataWarehouse -i scripts/silver/*.sql
 
-      - name: Confirm pipeline success
-        run: echo "CI passed - dbt_warehouse project structure validated"
+      - name: Configure dbt profile
+        run: |
+          mkdir -p ~/.dbt
+          cat <<EOF > ~/.dbt/profiles.yml
+          dbt_warehouse:
+            target: ci
+            outputs:
+              ci:
+                type: sqlserver
+                driver: "ODBC Driver 18 for SQL Server"
+                server: localhost
+                port: 1433
+                database: DataWarehouse
+                schema: dbo
+                user: sa
+                password: "TestPassword123!"
+                trust_cert: true
+          EOF
+
+      - name: dbt run (build Gold layer marts)
+        run: dbt run --profiles-dir ~/.dbt
+
+      - name: dbt test (staging + marts schema tests)
+        run: dbt test --profiles-dir ~/.dbt
+
+      - name: Run manual quality-check scripts (expect 0 rows)
+        run: |
+          for f in tests/quality_checks_silver.sql tests/quality_check_gold.sql; do
+            echo "Running $f ..."
+            rows=$(/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "TestPassword123!" -d DataWarehouse -i "$f" -h -1 | grep -v '^$' | wc -l)
+            if [ "$rows" -gt 0 ]; then
+              echo "::error::$f returned $rows unexpected row(s)"
+              exit 1
+            fi
+          done
