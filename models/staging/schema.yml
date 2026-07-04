@@ -1,0 +1,44 @@
+version: 2
+
+models:
+  - name: stg_crm_customers
+    description: "Cleaned CRM customer master data (renamed + trimmed from bronze.crm_cust_info)"
+    columns:
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+      - name: marital_status
+        tests:
+          - accepted_values:
+              values: ['single', 'married']
+              config:
+                severity: warn   # warn (not fail) since bronze may have unmapped codes
+      - name: gender
+        tests:
+          - accepted_values:
+              values: ['male', 'female']
+              config:
+                severity: warn
+      - name: record_status
+        tests:
+          - accepted_values:
+              values: ['valid', 'invalid']
+
+  - name: stg_crm_products
+    description: "Cleaned CRM product master data"
+    columns:
+      - name: product_id
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_crm_sales
+    description: "Cleaned CRM sales order line data"
+    columns:
+      - name: order_number
+        tests:
+          - not_null
+      - name: sales_amount
+        tests:
+          - not_null
