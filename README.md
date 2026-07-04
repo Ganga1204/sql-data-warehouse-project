@@ -326,7 +326,6 @@ ORDER BY month;
 - **Architecture Details** — See [docs/architecture.md](docs/architecture.md)
 - **dbt Documentation** — Run `dbt docs serve --port 8081` after dbt run
 - **Planning & Wireframes** — Maintained in Notion and Draw.io
-- **ERD Diagrams** — [Link to visualization tool]
 
 ---
 
