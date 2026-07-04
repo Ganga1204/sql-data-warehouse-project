@@ -101,13 +101,16 @@ EXEC silver.load_silver;
 
 #### 2️⃣ Run dbt Transformations
 ```bash
-cd dbt_warehouse
+# Run from the REPO ROOT — dbt_project.yml here points model-paths at ./models
 pip install dbt-sqlserver
 dbt debug
 dbt run
 dbt test
 dbt docs serve --port 8081
 ```
+> **Note:** `dbt_warehouse/` is a legacy stub folder from an earlier project
+> layout and is no longer used — the active dbt project (`dbt_project.yml`,
+> `models/`, `tests/`) now lives at the repo root.
 
 #### 3️⃣ Start Airflow
 cd airflow
@@ -176,6 +179,42 @@ models/
 **Test Results:**
 - `dbt run` → ✅ PASS=7 ERROR=0
 - `dbt test` → ✅ PASS=3 ERROR=0
+
+---
+
+## ✅ Testing
+
+Automated checks now run on every push and pull request via
+`.github/workflows/dbt_ci.yml`.
+
+**dbt schema tests**
+- `models/marts/schema.yml` — uniqueness/not-null on `dim_customers.customer_id`,
+  accepted values on `customer_segment`, not-null on `fct_sales.order_number`
+- `models/staging/schema.yml` *(new)* — uniqueness/not-null on
+  `stg_crm_customers.customer_id` and `stg_crm_products.product_id`,
+  not-null on `stg_crm_sales.order_number` and `sales_amount`, accepted
+  values on `marital_status` / `gender` / `record_status`
+
+**Manual quality-check scripts, now automated in CI**
+- `tests/quality_checks_silver.sql` — null/duplicate primary keys, unwanted
+  whitespace, invalid date ordering, sales = quantity × price consistency
+- `tests/quality_check_gold.sql` — uniqueness of dimension surrogate keys,
+  referential integrity between `fact_sales` and its dimensions
+
+Previously these two scripts had to be run and eyeballed by hand. CI now
+spins up a disposable SQL Server container, loads Bronze → Silver, runs
+both scripts automatically, and fails the build if either returns any rows
+(both are written to expect zero results).
+
+Run everything locally:
+```bash
+dbt run
+dbt test
+sqlcmd -S localhost -d DataWarehouse -i tests/quality_checks_silver.sql
+sqlcmd -S localhost -d DataWarehouse -i tests/quality_check_gold.sql
+```
+
+---
 
 ### 📈 View Lineage Graph
 ```bash
