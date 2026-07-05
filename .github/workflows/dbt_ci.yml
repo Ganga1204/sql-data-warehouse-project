@@ -20,7 +20,7 @@ jobs:
         ports:
           - 1433:1433
         options: >-
-          --health-cmd="/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P TestPassword123! -Q 'SELECT 1'"
+          --health-cmd="exit 0"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
@@ -34,18 +34,69 @@ jobs:
         with:
           python-version: "3.11"
 
+      # BUG #1 (root cause of every red X so far): the workflow called
+      # /opt/mssql-tools18/bin/sqlcmd on every step, but that binary is
+      # never installed on the GitHub Actions runner itself -- the
+      # "services:" container only runs the SQL Server *engine*, it does
+      # not give the runner host a sqlcmd client. This step installs it.
+      - name: Install SQL Server command-line tools + ODBC driver
+        run: |
+          sudo curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
+          curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev msodbcsql18
+          echo "/opt/mssql-tools18/bin" >> "$GITHUB_PATH"
+
+      - name: Wait for SQL Server to accept connections
+        run: |
+          for i in $(seq 1 30); do
+            if sqlcmd -C -S localhost -U sa -P "TestPassword123!" -Q "SELECT 1" >/dev/null 2>&1; then
+              echo "SQL Server is up"
+              exit 0
+            fi
+            echo "Waiting for SQL Server... ($i/30)"
+            sleep 3
+          done
+          echo "::error::SQL Server never became reachable"
+          exit 1
+
       - name: Install dbt + SQL Server adapter
         run: pip install dbt-core dbt-sqlserver
 
-      # NOTE: models/ lives at the REPO ROOT (not inside dbt_warehouse/),
-      # and dbt_project.yml at the root already points model-paths to "models".
-      # We run dbt from the repo root, not from dbt_warehouse/.
+      # BUG #2: scripts/bronze/*.sql and scripts/silver/*.sql silently
+      # matched the WRONG files. Your actual filenames are:
+      #   scripts/bronze/ddl_bronze.SQL          <- uppercase .SQL
+      #   scripts/bronze/proc_load_bronze.SQL    <- uppercase .SQL
+      #   scripts/silver/ddl_silver              <- no extension at all
+      #   scripts/silver/proc_load_silver.sql    <- lowercase .sql
+      # Linux is case-sensitive, so a lowercase "*.sql" glob matched NONE
+      # of the bronze files and only ONE of the two silver files (missing
+      # the table definitions in ddl_silver entirely). We now find files
+      # by name explicitly, case-insensitively, and run ddl before proc.
+      #
+      # BUG #3: sqlcmd's -i flag does not accept a space-separated list of
+      # files the way a bash glob expands one -- each file must be passed
+      # in its own sqlcmd invocation, which this loop now does.
       - name: Load Bronze + Silver + Gold layers into test DB
         run: |
-          /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "TestPassword123!" -Q "CREATE DATABASE DataWarehouse"
-          /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "TestPassword123!" -d DataWarehouse -i scripts/init_database.sql
-          /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "TestPassword123!" -d DataWarehouse -i scripts/bronze/*.sql
-          /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "TestPassword123!" -d DataWarehouse -i scripts/silver/*.sql
+          set -e
+          sqlcmd -C -S localhost -U sa -P "TestPassword123!" -d master -i scripts/init_database.sql
+
+          for f in $(find scripts/bronze -iname "ddl_*" | sort) \
+                   $(find scripts/bronze -iname "proc_*" | sort); do
+            echo "Running $f ..."
+            sqlcmd -C -S localhost -U sa -P "TestPassword123!" -d DataWarehouse -i "$f"
+          done
+
+          for f in $(find scripts/silver -iname "ddl_*" | sort) \
+                   $(find scripts/silver -iname "proc_*" | sort); do
+            echo "Running $f ..."
+            sqlcmd -C -S localhost -U sa -P "TestPassword123!" -d DataWarehouse -i "$f"
+          done
+
+          # Execute the stored procedures that actually load the data
+          sqlcmd -C -S localhost -U sa -P "TestPassword123!" -d DataWarehouse -Q "EXEC bronze.load_bronze;"
+          sqlcmd -C -S localhost -U sa -P "TestPassword123!" -d DataWarehouse -Q "EXEC silver.load_silver;"
 
       - name: Configure dbt profile
         run: |
@@ -76,7 +127,7 @@ jobs:
         run: |
           for f in tests/quality_checks_silver.sql tests/quality_check_gold.sql; do
             echo "Running $f ..."
-            rows=$(/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "TestPassword123!" -d DataWarehouse -i "$f" -h -1 | grep -v '^$' | wc -l)
+            rows=$(sqlcmd -C -S localhost -U sa -P "TestPassword123!" -d DataWarehouse -i "$f" -h -1 | grep -v '^$' | wc -l)
             if [ "$rows" -gt 0 ]; then
               echo "::error::$f returned $rows unexpected row(s)"
               exit 1
